@@ -1,7 +1,10 @@
 description = "Use all emotes in any server without Nitro."
-version = "1.0.12"
+version = "1.0.13"
 
 aliucord.changelog.set("""
+  # 1.0.13
+  * (poorly) Fixed usable emojis being spoofed
+
   # 1.0.12
   * Make spoofed emojis display as normal emoji
   * Use markdown hyperlinks instead of raw emoji URLs

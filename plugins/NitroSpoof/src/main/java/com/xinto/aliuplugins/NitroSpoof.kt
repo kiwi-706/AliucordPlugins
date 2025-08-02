@@ -21,6 +21,7 @@ import java.lang.reflect.Field
 class NitroSpoof : Plugin() {
 
     private val reflectionCache = HashMap<String, Field>()
+    private var lastValidEmoji = "";
 
     override fun start(context: Context) {
         patcher.patch(
@@ -40,6 +41,8 @@ class NitroSpoof : Plugin() {
             InsteadHook { true }
         )
 
+        // Todo: find more suitable functions to patch that only deal with
+        // incoming messages
         patcher.after<Message>("getContent") { param ->
             val markdownRegex = Regex("""^\[[a-zA-Z0-9_~]+?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?name=([a-zA-Z0-9_]+)[^\)\(\[\]]*?\)$""")
             val markdownMatch = markdownRegex.find(param.result as String, 0)
@@ -58,7 +61,13 @@ class NitroSpoof : Plugin() {
             val emojiMatch = emojiRegex.find(param.result as String, 0)
 
             emojiMatch?.let {
+                // Todo: we need to check if this emojiID is usable and available
                 val emojiId = it.groupValues[3]
+
+                // As a temporary measure, I've done something far worse:
+                // cache the last emoji that was usable and available
+                if (emojiId == lastValidEmoji) return@after
+
                 val emojiName = it.groupValues[2]
                 val emojiExtension = if (it.groupValues[1] == "a") "gif" else "png"
                 val emoteSize = settings.getString(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT).toIntOrNull()
@@ -76,14 +85,16 @@ class NitroSpoof : Plugin() {
         val isUsable = thisObject.getCachedField<Boolean>("isUsable")
         val available = thisObject.getCachedField<Boolean>("available")
 
+        val idStr = thisObject.getCachedField<String>("idStr")
         if (isUsable && available) {
             callFrame.result = callFrame.result
+            lastValidEmoji = idStr
             return
         }
+        lastValidEmoji = ""
 
         var finalUrl = "https://cdn.discordapp.com/emojis/"
 
-        val idStr = thisObject.getCachedField<String>("idStr")
         val isAnimated = thisObject.getCachedField<Boolean>("isAnimated")
         val emoteName = thisObject.getCachedField<String>("name")
 
