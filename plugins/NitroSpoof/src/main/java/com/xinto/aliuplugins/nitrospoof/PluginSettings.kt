@@ -8,6 +8,8 @@ import com.aliucord.api.SettingsAPI
 import com.aliucord.fragments.SettingsPage
 import com.aliucord.views.Button
 import com.aliucord.views.TextInput
+import com.aliucord.views.Divider
+import com.discord.views.CheckedSetting
 
 class PluginSettings(
     private val settingsAPI: SettingsAPI
@@ -33,11 +35,22 @@ class PluginSettings(
             setOnClickListener {
                 settingsAPI.setString(EMOTE_SIZE_KEY, textInput.editText.text.toString())
                 Utils.showToast("Successfully saved!")
-                close()
             }
         }
 
         addView(textInput)
         addView(saveButton)
+
+        addView(Divider(context).apply {})
+
+        addView(Utils.createCheckedSetting(
+            context, CheckedSetting.ViewType.SWITCH, "Transform Compound Sentences",
+            "[Experimental + Restart Recommended]\nTransform fake emojis in compound sentences (messages that aren't just one emoji)"
+        ).apply {
+            isChecked = settingsAPI.getBool(COMPOUND_SENTENCES_KEY, COMPOUND_SENTENCES_DEFAULT)
+            setOnCheckedListener {
+                settingsAPI.setBool(COMPOUND_SENTENCES_KEY, it)
+            }
+        })
     }
 }

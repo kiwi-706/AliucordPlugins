@@ -7,14 +7,19 @@ import com.aliucord.patcher.Hook
 import com.aliucord.patcher.InsteadHook
 import com.aliucord.patcher.after
 import com.aliucord.patcher.before
+import com.aliucord.patcher.PreHook
 import com.xinto.aliuplugins.nitrospoof.EMOTE_SIZE_DEFAULT
 import com.xinto.aliuplugins.nitrospoof.EMOTE_SIZE_KEY
+import com.xinto.aliuplugins.nitrospoof.COMPOUND_SENTENCES_DEFAULT
+import com.xinto.aliuplugins.nitrospoof.COMPOUND_SENTENCES_KEY
 import com.xinto.aliuplugins.nitrospoof.PluginSettings
 import com.discord.app.AppFragment
 import com.discord.models.domain.emoji.ModelEmojiCustom
 import com.discord.models.message.Message
 import com.discord.restapi.RestAPIParams
 import com.discord.widgets.chat.list.actions.`WidgetChatListActions$onViewCreated$2`
+import com.discord.api.message.embed.MessageEmbed
+import com.discord.stores.StoreStream
 import de.robv.android.xposed.XC_MethodHook
 import java.lang.reflect.Field
 
@@ -24,19 +29,9 @@ import java.lang.reflect.Field
 class NitroSpoof : Plugin() {
 
     private val reflectionCache = HashMap<String, Field>()
-    private var lastValidEmoji = "";
     private var reactionsListOpen = false;
 
     override fun start(context: Context) {
-        patcher.patch(
-            ModelEmojiCustom::class.java.getDeclaredMethod("getChatInputText"),
-            Hook { getChatReplacement(it) }
-        )
-        patcher.patch(
-            ModelEmojiCustom::class.java.getDeclaredMethod("getMessageContentReplacement"),
-            Hook { getChatReplacement(it) }
-        )
-
         patcher.before<ModelEmojiCustom>("isUsable") { param ->
             if (!reactionsListOpen) {
                 param.result = true
@@ -61,73 +56,84 @@ class NitroSpoof : Plugin() {
             reactionsListOpen = false;
         }
 
-        // Todo: find more suitable functions to patch that only deal with
-        // incoming messages
-        patcher.after<Message>("getContent") { param ->
-            val markdownRegex = Regex("""^\[[a-zA-Z0-9_~]+?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?name=([a-zA-Z0-9_]+)[^\)\(\[\]]*?\)$""")
-            val markdownMatch = markdownRegex.find(param.result as String, 0)
+        val messageCtor = Message::class.java.declaredConstructors.firstOrNull {
+            !it.isSynthetic
+        } ?: throw IllegalStateException("Didn't find Message ctor")
 
-            markdownMatch?.let {
-                val emojiId = it.groupValues[1]
-                val animated = if (it.groupValues[2] == "gif") "a" else ""
-                val emojiName = it.groupValues[3]
-                param.result = "<$animated:$emojiName:$emojiId>"
-                embeds.clear();
+        patcher.patch(messageCtor, PreHook { param ->
+            if (param.args[4] != null) {
+                var markdownRegex: Regex;
+                
+                if (settings.getBool(COMPOUND_SENTENCES_KEY, COMPOUND_SENTENCES_DEFAULT)) {
+                    markdownRegex = Regex("""\[[a-zA-Z0-9_~]+?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?name=([a-zA-Z0-9_]+)[^\)\(\[\]]*?\)""");
+                } else {
+                    markdownRegex = Regex("""^\[[a-zA-Z0-9_~]+?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?name=([a-zA-Z0-9_]+)[^\)\(\[\]]*?\)$""");
+                }
+
+                val oldEmbeds = param.args[12] as List<MessageEmbed>
+                val newEmbeds = ArrayList<MessageEmbed>(oldEmbeds)
+
+                param.args[4] = markdownRegex.replace(param.args[4] as String) {
+                    val emojiId = it.groupValues[1]
+                    val animated = if (it.groupValues[2] == "gif") "a" else ""
+                    val emojiName = it.groupValues[3]
+
+                    newEmbeds.removeIf {
+                        it.l().startsWith("https://cdn.discordapp.com/emojis/$emojiId")
+                    }
+
+                    "<$animated:$emojiName:$emojiId>"
+                }
+                param.args[12] = newEmbeds
             }
+        })
+
+        patcher.before<ModelEmojiCustom>("getMessageContentReplacement") { param ->
+            val isUsable = getCachedField<Boolean>("isUsable")
+            val available = getCachedField<Boolean>("available")
+
+            if (isUsable && available) {
+                return@before
+            }
+
+            val emojiId = getCachedField<String>("idStr")
+            val animated = if (getCachedField<Boolean>("isAnimated")) "a" else ""
+            val emojiName = getCachedField<String>("name")
+            param.result = "<$animated:FAKE_$emojiName:$emojiId>"
         }
 
-        patcher.after<RestAPIParams.Message>("getContent") { param ->
-            val emojiRegex = Regex("""^<(a)?:([a-zA-Z0-9_]+):(\d+)>$""")
-            val emojiMatch = emojiRegex.find(param.result as String, 0)
+        val restApiMessageCtor = RestAPIParams.Message::class.java.declaredConstructors.firstOrNull {
+            !it.isSynthetic
+        } ?: throw IllegalStateException("Didn't find RestAPIParams.Message ctor")
+        val restApiMessageContent = RestAPIParams.Message::class.java.getDeclaredField("content")
+        restApiMessageContent.isAccessible = true
 
-            emojiMatch?.let {
-                // Todo: we need to check if this emojiID is usable and available
-                val emojiId = it.groupValues[3]
+        patcher.patch(restApiMessageCtor, Hook { param ->
+            val emojiRegex = Regex("""<(a)?:(FAKE_)?([a-zA-Z0-9_]+):(\d+)>""")
+            var content = restApiMessageContent.get(param.thisObject)
 
-                // As a temporary measure, I've done something far worse:
-                // cache the last emoji that was usable and available
-                if (emojiId == lastValidEmoji) return@after
-
-                val emojiName = it.groupValues[2]
+            content = emojiRegex.replace(content as String) {
+                val isFake = it.groupValues[2] == "FAKE_"
+                if (!isFake) return@replace it.value
+ 
+                val emojiName = it.groupValues[3]
+                val emojiId = it.groupValues[4]
                 val emojiExtension = if (it.groupValues[1] == "a") "gif" else "png"
                 val emoteSize = settings.getString(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT).toIntOrNull()
-                param.result = "[$emojiName](https://cdn.discordapp.com/emojis/$emojiId.$emojiExtension?quality=lossless&name=$emojiName&size=$emoteSize)"
+                return@replace "[$emojiName](https://cdn.discordapp.com/emojis/$emojiId.$emojiExtension?quality=lossless&name=$emojiName&size=$emoteSize)"
             }
-        }
+
+            restApiMessageContent.set(param.thisObject, content);
+        })
+
+        val experiments = StoreStream.getExperiments()
+        experiments.setOverride("2021-03_nitro_emoji_autocomplete_upsell_android", 1)
     }
 
     override fun stop(context: Context) {
         patcher.unpatchAll()
-    }
-
-    private fun getChatReplacement(callFrame: XC_MethodHook.MethodHookParam) {
-        val thisObject = callFrame.thisObject as ModelEmojiCustom
-        val isUsable = thisObject.getCachedField<Boolean>("isUsable")
-        val available = thisObject.getCachedField<Boolean>("available")
-
-        val idStr = thisObject.getCachedField<String>("idStr")
-        if (isUsable && available) {
-            callFrame.result = callFrame.result
-            lastValidEmoji = idStr
-            return
-        }
-        lastValidEmoji = ""
-
-        var finalUrl = "https://cdn.discordapp.com/emojis/"
-
-        val isAnimated = thisObject.getCachedField<Boolean>("isAnimated")
-        val emoteName = thisObject.getCachedField<String>("name")
-
-        finalUrl += idStr
-        val emoteSize = settings.getString(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT).toIntOrNull()
-
-        finalUrl += (if (isAnimated) ".gif" else ".png") + "?quality=lossless&name=" + emoteName
-
-        if (emoteSize != null) {
-            finalUrl += "&size=${emoteSize}"
-        }
-        
-        callFrame.result = "[" + emoteName + "]" + "(" + finalUrl + ")"
+        val experiments = StoreStream.getExperiments();
+        experiments.setOverride("2021-03_nitro_emoji_autocomplete_upsell_android", 0)
     }
 
     /**
