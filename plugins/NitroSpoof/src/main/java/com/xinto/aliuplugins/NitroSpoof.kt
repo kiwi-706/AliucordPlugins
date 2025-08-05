@@ -6,12 +6,15 @@ import com.aliucord.entities.Plugin
 import com.aliucord.patcher.Hook
 import com.aliucord.patcher.InsteadHook
 import com.aliucord.patcher.after
+import com.aliucord.patcher.before
 import com.xinto.aliuplugins.nitrospoof.EMOTE_SIZE_DEFAULT
 import com.xinto.aliuplugins.nitrospoof.EMOTE_SIZE_KEY
 import com.xinto.aliuplugins.nitrospoof.PluginSettings
+import com.discord.app.AppFragment
 import com.discord.models.domain.emoji.ModelEmojiCustom
 import com.discord.models.message.Message
 import com.discord.restapi.RestAPIParams
+import com.discord.widgets.chat.list.actions.`WidgetChatListActions$onViewCreated$2`
 import de.robv.android.xposed.XC_MethodHook
 import java.lang.reflect.Field
 
@@ -22,6 +25,7 @@ class NitroSpoof : Plugin() {
 
     private val reflectionCache = HashMap<String, Field>()
     private var lastValidEmoji = "";
+    private var reactionsListOpen = false;
 
     override fun start(context: Context) {
         patcher.patch(
@@ -32,14 +36,30 @@ class NitroSpoof : Plugin() {
             ModelEmojiCustom::class.java.getDeclaredMethod("getMessageContentReplacement"),
             Hook { getChatReplacement(it) }
         )
-        patcher.patch(
-            ModelEmojiCustom::class.java.getDeclaredMethod("isUsable"),
-            InsteadHook { true }
-        )
-        patcher.patch(
-            ModelEmojiCustom::class.java.getDeclaredMethod("isAvailable"),
-            InsteadHook { true }
-        )
+
+        patcher.before<ModelEmojiCustom>("isUsable") { param ->
+            if (!reactionsListOpen) {
+                param.result = true
+            }
+        }
+
+        patcher.before<ModelEmojiCustom>("isAvailable") { param ->
+            if (!reactionsListOpen) {
+                param.result = true
+            }
+        }
+
+        patcher.before<`WidgetChatListActions$onViewCreated$2`>(
+            "invoke"
+        ) { _ ->
+            reactionsListOpen = true;
+        }
+
+        patcher.after<AppFragment>(
+            "onDetach"
+        ) { _ ->
+            reactionsListOpen = false;
+        }
 
         // Todo: find more suitable functions to patch that only deal with
         // incoming messages

@@ -1,7 +1,10 @@
 description = "Use all emotes in any server without Nitro."
-version = "1.0.13"
+version = "1.0.14"
 
 aliucord.changelog.set("""
+  # 1.0.14
+  * Reaction emoji picker now only shows valid emojis
+
   # 1.0.13
   * (poorly) Fixed usable emojis being spoofed
 
