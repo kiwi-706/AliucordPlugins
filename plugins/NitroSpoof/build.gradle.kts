@@ -1,7 +1,10 @@
 description = "Use all emotes in any server without Nitro."
-version = "1.1.1"
+version = "1.1.2"
 
 aliucord.changelog.set("""
+# 1.1.2
+* Fixed emoji names with ~ being incorrectly replaced
+
 # 1.1.1
 * Fixed animated webp being replaced as non-animated emoji
 

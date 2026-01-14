@@ -88,7 +88,7 @@ class NitroSpoof : Plugin() {
                             animated = "a"
                         }
                         if (pair[0] == "name") {
-                            emojiName = pair[1]
+                            emojiName = pair[1].takeWhile { it.isLetterOrDigit() || it == '_' }
                         }
                     }
 
