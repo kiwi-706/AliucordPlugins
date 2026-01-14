@@ -22,6 +22,7 @@ import com.discord.api.message.embed.MessageEmbed
 import com.discord.stores.StoreStream
 import de.robv.android.xposed.XC_MethodHook
 import java.lang.reflect.Field
+import java.net.URL
 
 // Savior of this project: https://gitdab.com/Juby210/discord-jadx/
 
@@ -29,7 +30,7 @@ import java.lang.reflect.Field
 class NitroSpoof : Plugin() {
 
     private val reflectionCache = HashMap<String, Field>()
-    private var reactionsListOpen = false;
+    private var reactionsListOpen = false
 
     override fun start(context: Context) {
         patcher.before<ModelEmojiCustom>("isUsable") { param ->
@@ -47,13 +48,13 @@ class NitroSpoof : Plugin() {
         patcher.before<`WidgetChatListActions$onViewCreated$2`>(
             "invoke"
         ) { _ ->
-            reactionsListOpen = true;
+            reactionsListOpen = true
         }
 
         patcher.after<AppFragment>(
             "onDetach"
         ) { _ ->
-            reactionsListOpen = false;
+            reactionsListOpen = false
         }
 
         val messageCtor = Message::class.java.declaredConstructors.firstOrNull {
@@ -62,21 +63,34 @@ class NitroSpoof : Plugin() {
 
         patcher.patch(messageCtor, PreHook { param ->
             if (param.args[4] != null) {
-                var markdownRegex: Regex;
+                var markdownRegex: Regex
                 
                 if (settings.getBool(COMPOUND_SENTENCES_KEY, COMPOUND_SENTENCES_DEFAULT)) {
-                    markdownRegex = Regex("""\[[a-zA-Z0-9_~]+?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?name=([a-zA-Z0-9_]+)[^\)\(\[\]]*?\)""");
+                    markdownRegex = Regex("""\[[a-zA-Z0-9_~]+?\]\((https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?)\)""")
                 } else {
-                    markdownRegex = Regex("""^\[[a-zA-Z0-9_~]+?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?name=([a-zA-Z0-9_]+)[^\)\(\[\]]*?\)$""");
+                    markdownRegex = Regex("""^\[[a-zA-Z0-9_~]+?\]\((https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?)\)$""")
                 }
 
                 val oldEmbeds = param.args[12] as List<MessageEmbed>
                 val newEmbeds = ArrayList<MessageEmbed>(oldEmbeds)
 
                 param.args[4] = markdownRegex.replace(param.args[4] as String) {
-                    val emojiId = it.groupValues[1]
-                    val animated = if (it.groupValues[2] == "gif") "a" else ""
-                    val emojiName = it.groupValues[3]
+                    val url = it.groupValues[1]
+                    val emojiId = it.groupValues[2]
+                    val extension = it.groupValues[3]
+
+                    var animated = if (extension == "gif") "a" else ""
+                    var emojiName = "UNKNOWN_FAKE_EMOJI"
+
+                    URL(url).query.split("&").forEach {
+                        val pair = it.split("=")
+                        if (extension == "webp" && pair[0] == "animated" && pair[1] == "true") {
+                            animated = "a"
+                        }
+                        if (pair[0] == "name") {
+                            emojiName = pair[1]
+                        }
+                    }
 
                     newEmbeds.removeIf {
                         it.l().startsWith("https://cdn.discordapp.com/emojis/$emojiId")
@@ -123,7 +137,7 @@ class NitroSpoof : Plugin() {
                 return@replace "[$emojiName](https://cdn.discordapp.com/emojis/$emojiId.$emojiExtension?quality=lossless&name=$emojiName&size=$emoteSize)"
             }
 
-            restApiMessageContent.set(param.thisObject, content);
+            restApiMessageContent.set(param.thisObject, content)
         })
 
         val experiments = StoreStream.getExperiments()
@@ -132,7 +146,7 @@ class NitroSpoof : Plugin() {
 
     override fun stop(context: Context) {
         patcher.unpatchAll()
-        val experiments = StoreStream.getExperiments();
+        val experiments = StoreStream.getExperiments()
         experiments.setOverride("2021-03_nitro_emoji_autocomplete_upsell_android", 0)
     }
 

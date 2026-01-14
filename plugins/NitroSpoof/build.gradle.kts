@@ -1,7 +1,10 @@
 description = "Use all emotes in any server without Nitro."
-version = "1.1.0"
+version = "1.1.1"
 
 aliucord.changelog.set("""
+# 1.1.1
+* Fixed animated webp being replaced as non-animated emoji
+
 # 1.1.0
 * (Experimental) Added option to "transform compound sentences"
 * Reworked message replacement patches - this should reduce flashing
