@@ -1,7 +1,10 @@
 description = "Use all emotes in any server without Nitro."
-version = "1.1.2"
+version = "1.1.3"
 
 aliucord.changelog.set("""
+# 1.1.3
+* Fixed reaction emoji picker when using the quick add reaction button
+
 # 1.1.2
 * Fixed emoji names with ~ being incorrectly replaced
 

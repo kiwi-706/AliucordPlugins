@@ -18,6 +18,7 @@ import com.discord.models.domain.emoji.ModelEmojiCustom
 import com.discord.models.message.Message
 import com.discord.restapi.RestAPIParams
 import com.discord.widgets.chat.list.actions.`WidgetChatListActions$onViewCreated$2`
+import com.discord.widgets.chat.list.adapter.WidgetChatListAdapter
 import com.discord.api.message.embed.MessageEmbed
 import com.discord.stores.StoreStream
 import de.robv.android.xposed.XC_MethodHook
@@ -47,6 +48,12 @@ class NitroSpoof : Plugin() {
 
         patcher.before<`WidgetChatListActions$onViewCreated$2`>(
             "invoke"
+        ) { _ ->
+            reactionsListOpen = true
+        }
+
+        patcher.before<WidgetChatListAdapter>(
+            "onQuickAddReactionClicked", Long::class.java
         ) { _ ->
             reactionsListOpen = true
         }
