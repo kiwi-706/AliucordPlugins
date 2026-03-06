@@ -12,6 +12,8 @@ import com.xinto.aliuplugins.nitrospoof.EMOTE_SIZE_DEFAULT
 import com.xinto.aliuplugins.nitrospoof.EMOTE_SIZE_KEY
 import com.xinto.aliuplugins.nitrospoof.COMPOUND_SENTENCES_DEFAULT
 import com.xinto.aliuplugins.nitrospoof.COMPOUND_SENTENCES_KEY
+import com.xinto.aliuplugins.nitrospoof.FORCE_WEBP_KEY
+import com.xinto.aliuplugins.nitrospoof.FORCE_WEBP_DEFAULT
 import com.xinto.aliuplugins.nitrospoof.PluginSettings
 import com.discord.app.AppFragment
 import com.discord.models.domain.emoji.ModelEmojiCustom
@@ -71,25 +73,28 @@ class NitroSpoof : Plugin() {
         patcher.patch(messageCtor, PreHook { param ->
             if (param.args[4] != null) {
                 var markdownRegex: Regex
-                
+                var directURLRegex: Regex
+
                 if (settings.getBool(COMPOUND_SENTENCES_KEY, COMPOUND_SENTENCES_DEFAULT)) {
-                    markdownRegex = Regex("""\[[a-zA-Z0-9_~]+?\]\((https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?)\)""")
+                    markdownRegex = Regex("""\[(?:[a-zA-Z0-9_~]+?|\u2236[a-zA-Z0-9_~]+?\u2236|.|\u200b|\u180c)\]\((https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?)\)""")
+                    directURLRegex = Regex("""(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})[A-Za-z=\d&%\?]*)""")
                 } else {
-                    markdownRegex = Regex("""^\[[a-zA-Z0-9_~]+?\]\((https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?)\)$""")
+                    markdownRegex = Regex("""^\[(?:[a-zA-Z0-9_~]+?|\u2236[a-zA-Z0-9_~]+?\u2236|.|\u200b|\u180c)\]\((https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?)\)$""")
+                    directURLRegex = Regex("""^(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})[A-Za-z=\d&%\?]*)$""")
                 }
 
                 val oldEmbeds = param.args[12] as List<MessageEmbed>
                 val newEmbeds = ArrayList<MessageEmbed>(oldEmbeds)
 
-                param.args[4] = markdownRegex.replace(param.args[4] as String) {
-                    val url = it.groupValues[1]
-                    val emojiId = it.groupValues[2]
-                    val extension = it.groupValues[3]
+                fun replace(match: MatchResult): CharSequence {
+                    val url = match.groupValues[1]
+                    val emojiId = match.groupValues[2]
+                    val extension = match.groupValues[3]
 
                     var animated = if (extension == "gif") "a" else ""
                     var emojiName = "UNKNOWN_FAKE_EMOJI"
 
-                    URL(url).query.split("&").forEach {
+                    URL(url).query?.split("&")?.forEach {
                         val pair = it.split("=")
                         if (extension == "webp" && pair[0] == "animated" && pair[1] == "true") {
                             animated = "a"
@@ -103,8 +108,12 @@ class NitroSpoof : Plugin() {
                         it.l().startsWith("https://cdn.discordapp.com/emojis/$emojiId")
                     }
 
-                    "<$animated:$emojiName:$emojiId>"
+                    return "<$animated:$emojiName:$emojiId>"
                 }
+
+                param.args[4] = markdownRegex.replace(param.args[4] as String) { replace (it) }
+                param.args[4] = directURLRegex.replace(param.args[4] as String) { replace (it) }
+
                 param.args[12] = newEmbeds
             }
         })
@@ -139,8 +148,15 @@ class NitroSpoof : Plugin() {
  
                 val emojiName = it.groupValues[3]
                 val emojiId = it.groupValues[4]
-                val emojiExtension = if (it.groupValues[1] == "a") "gif" else "png"
+
                 val emoteSize = settings.getString(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT).toIntOrNull()
+
+                if (settings.getBool(FORCE_WEBP_KEY, FORCE_WEBP_DEFAULT)) {
+                    val animated = if (it.groupValues[1] == "a") "animated=true&" else ""
+                    return@replace "[$emojiName](https://cdn.discordapp.com/emojis/$emojiId.webp?${animated}quality=lossless&name=$emojiName&size=$emoteSize)"    
+                }
+
+                val emojiExtension = if (it.groupValues[1] == "a") "gif" else "png"
                 return@replace "[$emojiName](https://cdn.discordapp.com/emojis/$emojiId.$emojiExtension?quality=lossless&name=$emojiName&size=$emoteSize)"
             }
 

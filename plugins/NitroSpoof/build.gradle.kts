@@ -1,7 +1,11 @@
 description = "Use all emotes in any server without Nitro."
-version = "1.1.3"
+version = "1.2.0"
 
 aliucord.changelog.set("""
+# 1.2.0
+* Improved compatibility with other NitroSpoof forks. Spoofed emojis using zero-width hyperlinks or direct URLs now display as normal emoji.
+* Added option to "Always use WebP" in emoji links.
+
 # 1.1.3
 * Fixed reaction emoji picker when using the quick add reaction button
 
