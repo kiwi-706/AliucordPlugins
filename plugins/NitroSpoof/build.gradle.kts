@@ -1,7 +1,12 @@
 description = "Use all emotes in any server without Nitro."
-version = "1.2.0"
+version = "1.3.0"
 
 aliucord.changelog.set("""
+# 1.3.0 - Settings Overhaul
+* Added option to disable emoji transforms / realmoji
+* Added option to change markdown format (Credit: @nyxiereal's FreeNitroEmojis)
+* Changed "Emote Size" option to use a slider
+
 # 1.2.0
 * Improved compatibility with other NitroSpoof forks. Spoofed emojis using zero-width hyperlinks or direct URLs now display as normal emoji.
 * Added option to "Always use WebP" in emoji links.
@@ -37,4 +42,5 @@ Note: Originally developed by Xinto
 
 aliucord {
   author("Xinto", 423915768191647755L)
+  author("nyxiereal", 1242567443742986373L)
 }

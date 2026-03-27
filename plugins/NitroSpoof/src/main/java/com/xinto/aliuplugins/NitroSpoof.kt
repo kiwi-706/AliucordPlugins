@@ -8,13 +8,7 @@ import com.aliucord.patcher.InsteadHook
 import com.aliucord.patcher.after
 import com.aliucord.patcher.before
 import com.aliucord.patcher.PreHook
-import com.xinto.aliuplugins.nitrospoof.EMOTE_SIZE_DEFAULT
-import com.xinto.aliuplugins.nitrospoof.EMOTE_SIZE_KEY
-import com.xinto.aliuplugins.nitrospoof.COMPOUND_SENTENCES_DEFAULT
-import com.xinto.aliuplugins.nitrospoof.COMPOUND_SENTENCES_KEY
-import com.xinto.aliuplugins.nitrospoof.FORCE_WEBP_KEY
-import com.xinto.aliuplugins.nitrospoof.FORCE_WEBP_DEFAULT
-import com.xinto.aliuplugins.nitrospoof.PluginSettings
+import com.xinto.aliuplugins.nitrospoof.*
 import com.discord.app.AppFragment
 import com.discord.models.domain.emoji.ModelEmojiCustom
 import com.discord.models.message.Message
@@ -71,7 +65,7 @@ class NitroSpoof : Plugin() {
         } ?: throw IllegalStateException("Didn't find Message ctor")
 
         patcher.patch(messageCtor, PreHook { param ->
-            if (param.args[4] != null) {
+            if (settings.getBool(REALMOJI_KEY, REALMOJI_DEFAULT) && param.args[4] != null) {
                 var markdownRegex: Regex
                 var directURLRegex: Regex
 
@@ -127,9 +121,15 @@ class NitroSpoof : Plugin() {
             }
 
             val emojiId = getCachedField<String>("idStr")
-            val animated = if (getCachedField<Boolean>("isAnimated")) "a" else ""
+            val isAnimated = getCachedField<Boolean>("isAnimated")
             val emojiName = getCachedField<String>("name")
-            param.result = "<$animated:FAKE_$emojiName:$emojiId>"
+
+            if (settings.getBool(REALMOJI_KEY, REALMOJI_DEFAULT)) {
+                val animated = if (isAnimated) "a" else ""
+                param.result = "<$animated:FAKE_$emojiName:$emojiId>"
+            } else {
+                param.result = getMarkdown(emojiName, emojiId, isAnimated)
+            }
         }
 
         val restApiMessageCtor = RestAPIParams.Message::class.java.declaredConstructors.firstOrNull {
@@ -149,15 +149,7 @@ class NitroSpoof : Plugin() {
                 val emojiName = it.groupValues[3]
                 val emojiId = it.groupValues[4]
 
-                val emoteSize = settings.getString(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT).toIntOrNull()
-
-                if (settings.getBool(FORCE_WEBP_KEY, FORCE_WEBP_DEFAULT)) {
-                    val animated = if (it.groupValues[1] == "a") "animated=true&" else ""
-                    return@replace "[$emojiName](https://cdn.discordapp.com/emojis/$emojiId.webp?${animated}quality=lossless&name=$emojiName&size=$emoteSize)"    
-                }
-
-                val emojiExtension = if (it.groupValues[1] == "a") "gif" else "png"
-                return@replace "[$emojiName](https://cdn.discordapp.com/emojis/$emojiId.$emojiExtension?quality=lossless&name=$emojiName&size=$emoteSize)"
+                return@replace getMarkdown(emojiName, emojiId, it.groupValues[1] == "a")
             }
 
             restApiMessageContent.set(param.thisObject, content)
@@ -194,5 +186,27 @@ class NitroSpoof : Plugin() {
             PluginSettings::class.java,
             SettingsTab.Type.PAGE
         ).withArgs(settings)
+    }
+
+    private fun getMarkdown(emojiName: String, emojiId: String, animated: Boolean): String {
+        val emoteSize = settings.getInt(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT)
+        var url = "https://cdn.discordapp.com/emojis/$emojiId."
+
+        if (settings.getBool(FORCE_WEBP_KEY, FORCE_WEBP_DEFAULT)) {
+            val animatedQuery = if (animated) "animated=true&" else ""
+            url += "webp?${animatedQuery}"
+        } else {
+            val emojiExtension = if (animated) "gif" else "png"
+            url += "$emojiExtension?"
+        }
+        url += "quality=lossless&name=$emojiName&size=$emoteSize"
+
+        // Format type selection - credit @nyxiereal - https://github.com/nyxiereal/AliucordPlugins/
+        return when (settings.getString(FORMAT_KEY, FORMAT_DEFAULT)) {
+            FORMAT_EXTENDED_MD -> "[\u2236$emojiName\u2236]($url)"
+            FORMAT_MARKDOWN -> "[$emojiName]($url)"
+            FORMAT_ZERO_WIDTH_JOINER -> "[\u180c]($url)"
+            else -> url
+        }
     }
 }
