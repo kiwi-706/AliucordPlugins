@@ -189,7 +189,7 @@ class NitroSpoof : Plugin() {
     }
 
     private fun getMarkdown(emojiName: String, emojiId: String, animated: Boolean): String {
-        val emoteSize = settings.getInt(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT)
+        val emoteSize = try { settings.getInt(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT) } catch (_: Exception) { EMOTE_SIZE_DEFAULT }
         var url = "https://cdn.discordapp.com/emojis/$emojiId."
 
         if (settings.getBool(FORCE_WEBP_KEY, FORCE_WEBP_DEFAULT)) {

@@ -34,7 +34,13 @@ class PluginSettings(
         emoteSizeSlider.setMin(0)
         emoteSizeSlider.setMax(emoteSizes.size - 1)
 
-        var currentIndex = emoteSizes.indexOf(settingsAPI.getInt(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT))
+        var currentIndex = emoteSizes.indexOf(
+            try { settingsAPI.getInt(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT) } catch (_: Exception) { EMOTE_SIZE_DEFAULT }
+        )
+        if (currentIndex == -1) {
+            settingsAPI.setInt(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT)
+            currentIndex = emoteSizes.indexOf(EMOTE_SIZE_DEFAULT)
+        }
         emoteSizeSlider.setProgress(currentIndex)
 
         addView(emoteSizeSlider)
