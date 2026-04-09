@@ -71,10 +71,10 @@ class NitroSpoof : Plugin() {
 
                 if (settings.getBool(COMPOUND_SENTENCES_KEY, COMPOUND_SENTENCES_DEFAULT)) {
                     markdownRegex = Regex("""\[(?:[a-zA-Z0-9_~]+?|\u2236[a-zA-Z0-9_~]+?\u2236|.|\u200b|\u180c)\]\((https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?)\)""")
-                    directURLRegex = Regex("""(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})[A-Za-z=\d&%\?]*)""")
+                    directURLRegex = Regex("""(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})[A-Za-z=\d&%_\?]*)""")
                 } else {
                     markdownRegex = Regex("""^\[(?:[a-zA-Z0-9_~]+?|\u2236[a-zA-Z0-9_~]+?\u2236|.|\u200b|\u180c)\]\((https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})?[^\)\(\[\]]*?)\)$""")
-                    directURLRegex = Regex("""^(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})[A-Za-z=\d&%\?]*)$""")
+                    directURLRegex = Regex("""^(https:\/\/cdn\.discordapp\.com\/emojis\/(\d+)\.([a-z]{3,4})[A-Za-z=\d&%_\?]*)$""")
                 }
 
                 val oldEmbeds = param.args[12] as List<MessageEmbed>

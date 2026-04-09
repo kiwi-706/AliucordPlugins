@@ -1,7 +1,10 @@
 description = "Use all emotes in any server without Nitro."
-version = "1.3.1"
+version = "1.3.2"
 
 aliucord.changelog.set("""
+# 1.3.2
+* Fixed direct URLs transforms breaking if emoji name had _
+
 # 1.3.1
 * Fixed spoofing not working if emote size was previously set to an empty string
 * Also fixed a related crash when opening plugin settings page
