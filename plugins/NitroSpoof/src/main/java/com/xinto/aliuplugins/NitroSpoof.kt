@@ -190,16 +190,8 @@ class NitroSpoof : Plugin() {
 
     private fun getMarkdown(emojiName: String, emojiId: String, animated: Boolean): String {
         val emoteSize = try { settings.getInt(EMOTE_SIZE_KEY, EMOTE_SIZE_DEFAULT) } catch (_: Exception) { EMOTE_SIZE_DEFAULT }
-        var url = "https://cdn.discordapp.com/emojis/$emojiId."
-
-        if (settings.getBool(FORCE_WEBP_KEY, FORCE_WEBP_DEFAULT)) {
-            val animatedQuery = if (animated) "animated=true&" else ""
-            url += "webp?${animatedQuery}"
-        } else {
-            val emojiExtension = if (animated) "gif" else "png"
-            url += "$emojiExtension?"
-        }
-        url += "quality=lossless&name=$emojiName&size=$emoteSize"
+        val animatedQuery = if (animated) "animated=true&" else ""
+        var url = "https://cdn.discordapp.com/emojis/$emojiId.webp?${animatedQuery}quality=lossless&name=$emojiName&size=$emoteSize"
 
         // Format type selection - credit @nyxiereal - https://github.com/nyxiereal/AliucordPlugins/
         return when (settings.getString(FORMAT_KEY, FORMAT_DEFAULT)) {

@@ -1,7 +1,11 @@
 description = "Use all emotes in any server without Nitro."
-version = "1.3.2"
+version = "1.3.3"
 
 aliucord.changelog.set("""
+# 1.3.3
+* All emoji links now only use WebP (Update Aliucord if you have issues with animated emoji)
+* Removed WebP options from plugin settings
+
 # 1.3.2
 * Fixed direct URLs transforms breaking if emoji name had _
 
